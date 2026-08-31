@@ -428,6 +428,42 @@ def url_quote(obj: t.Any, charset: str = "utf-8", for_qs: bool = False) -> str:
     return rv
 
 
+class _ImmutableKey:
+    """Wrapper that makes any key hashable for storage in the deque.
+
+    Python 3.14 raises TypeError when attempting to use an unhashable
+    type (e.g. a dict) inside a tuple as a dict key, because
+    ``deque.remove()`` calls ``__hash__`` during the linear search.
+    This wrapper uses ``object.__hash__`` (identity-based hashing),
+    sidestepping the issue entirely.
+    """
+
+    __slots__ = ("_key", "_hash")
+
+    def __init__(self, key: t.Any) -> None:
+        self._key = key
+        self._hash = object.__hash__(key)
+
+    def __hash__(self) -> int:
+        return self._hash
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, _ImmutableKey):
+            return self._key is other._key
+        return NotImplemented
+
+    def __getstate__(self) -> dict[str, t.Any]:
+        return {"_key": self._key}
+
+    def __setstate__(self, state: dict[str, t.Any]) -> None:
+        self._key = state["_key"]
+        self._hash = object.__hash__(self._key)
+
+    @property
+    def key(self) -> t.Any:
+        return self._key
+
+
 @abc.MutableMapping.register
 class LRUCache:
     """A simple LRU Cache implementation."""
@@ -438,8 +474,8 @@ class LRUCache:
 
     def __init__(self, capacity: int) -> None:
         self.capacity = capacity
-        self._mapping: dict[t.Any, t.Any] = {}
-        self._queue: deque[t.Any] = deque()
+        self._mapping: dict[_ImmutableKey, t.Any] = {}
+        self._queue: deque[_ImmutableKey] = deque()
         self._postinit()
 
     def _postinit(self) -> None:
@@ -496,14 +532,14 @@ class LRUCache:
 
     def __contains__(self, key: t.Any) -> bool:
         """Check if a key exists in this cache."""
-        return key in self._mapping
+        return _ImmutableKey(key) in self._mapping
 
     def __len__(self) -> int:
         """Return the current size of the cache."""
         return len(self._mapping)
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__} {self._mapping!r}>"
+        return f"<{type(self).__name__} {{{', '.join(f'{k!r}: {v!r}' for k, v in self.items())}}}>"
 
     def __getitem__(self, key: t.Any) -> t.Any:
         """Get an item from the cache. Moves the item up so that it has the
@@ -512,18 +548,12 @@ class LRUCache:
         Raise a `KeyError` if it does not exist.
         """
         with self._wlock:
-            rv = self._mapping[key]
+            ikey = _ImmutableKey(key)
+            rv = self._mapping[ikey]
 
-            if self._queue[-1] != key:
-                try:
-                    self._remove(key)
-                except ValueError:
-                    # if something removed the key from the container
-                    # when we read, ignore the ValueError that we would
-                    # get otherwise.
-                    pass
-
-                self._append(key)
+            if self._queue[-1] != ikey:
+                self._queue.remove(ikey)
+                self._append(ikey)
 
             return rv
 
@@ -532,48 +562,45 @@ class LRUCache:
         has the highest priority then.
         """
         with self._wlock:
-            if key in self._mapping:
-                self._remove(key)
+            ikey = _ImmutableKey(key)
+            if ikey in self._mapping:
+                self._queue.remove(ikey)
             elif len(self._mapping) == self.capacity:
                 del self._mapping[self._popleft()]
 
-            self._append(key)
-            self._mapping[key] = value
+            self._append(ikey)
+            self._mapping[ikey] = value
 
     def __delitem__(self, key: t.Any) -> None:
         """Remove an item from the cache dict.
         Raise a `KeyError` if it does not exist.
         """
         with self._wlock:
-            del self._mapping[key]
-
-            try:
-                self._remove(key)
-            except ValueError:
-                pass
+            ikey = _ImmutableKey(key)
+            del self._mapping[ikey]
+            self._queue.remove(ikey)
 
     def items(self) -> t.Iterable[tuple[t.Any, t.Any]]:
         """Return a list of items."""
-        result = [(key, self._mapping[key]) for key in list(self._queue)]
-        result.reverse()
+        result = [(ikey.key, self._mapping[ikey]) for ikey in reversed(self._queue)]
         return result
 
     def values(self) -> t.Iterable[t.Any]:
         """Return a list of all values."""
-        return [x[1] for x in self.items()]
+        return [v for _, v in self.items()]
 
     def keys(self) -> t.Iterable[t.Any]:
         """Return a list of all keys ordered by most recent usage."""
         return list(self)
 
     def __iter__(self) -> t.Iterator[t.Any]:
-        return reversed(tuple(self._queue))
+        return (ikey.key for ikey in reversed(tuple(self._queue)))
 
     def __reversed__(self) -> t.Iterator[t.Any]:
         """Iterate over the keys in the cache dict, oldest items
         coming first.
         """
-        return iter(tuple(self._queue))
+        return (ikey.key for ikey in tuple(self._queue))
 
     __copy__ = copy
 
