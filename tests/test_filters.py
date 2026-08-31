@@ -189,6 +189,13 @@ class TestFilter:
         t = env.from_string("{{ 'jinja\nflask'|indent(width='>>> ', first=True) }}")
         assert t.render() == ">>> jinja\n>>> flask"
 
+    def test_indent_first_blank_line(self, env):
+        """Blank first line should not be indented when blank=False even with first=True."""
+        t = env.from_string("{% filter indent(4, first=True) %}{% endfilter %}")
+        assert t.render() == ""
+        t = env.from_string('{{ "foo\nbar"|indent(2, first=True, blank=False) }}')
+        assert t.render() == "  foo\n  bar"
+
     @pytest.mark.parametrize(
         ("value", "expect"),
         (

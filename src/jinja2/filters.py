@@ -860,7 +860,7 @@ def do_indent(
                 indention + line if line else line for line in lines
             )
 
-    if first:
+    if first and (rv or blank):
         rv = indention + rv
 
     return rv
