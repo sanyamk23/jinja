@@ -179,6 +179,15 @@ class TestFilter:
         t = env.from_string('{{ "jinja"|indent(blank=true) }}')
         assert t.render() == "jinja"
 
+    def test_indent_blank_false_skips_whitespace_only_lines(self, env):
+        t = env.from_string(
+            '{% filter indent(4, first=True, blank=False) %}    {% endfilter %}'
+        )
+        assert t.render() == ""
+
+        t = env.from_string('{% filter indent(4, first=False, blank=False) %}    {% endfilter %}')
+        assert t.render() == ""
+
     def test_indent_markup_input(self, env):
         """
         Tests cases where the filter input is a Markup type

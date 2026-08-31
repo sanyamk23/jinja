@@ -854,13 +854,15 @@ def do_indent(
     else:
         lines = s.splitlines()
         rv = lines.pop(0)
+        if not rv.strip():
+            rv = ""
 
         if lines:
             rv += newline + newline.join(
-                indention + line if line else line for line in lines
+                indention + line if line.strip() else line for line in lines
             )
 
-    if first:
+    if first and rv:
         rv = indention + rv
 
     return rv
