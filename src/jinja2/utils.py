@@ -442,14 +442,17 @@ class _ImmutableKey:
 
     def __init__(self, key: t.Any) -> None:
         self._key = key
-        self._hash = object.__hash__(key)
+        try:
+            self._hash = hash(key)
+        except TypeError:
+            self._hash = object.__hash__(key)
 
     def __hash__(self) -> int:
         return self._hash
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, _ImmutableKey):
-            return self._key is other._key
+            return self._key == other._key
         return NotImplemented
 
     def __getstate__(self) -> dict[str, t.Any]:
@@ -457,7 +460,10 @@ class _ImmutableKey:
 
     def __setstate__(self, state: dict[str, t.Any]) -> None:
         self._key = state["_key"]
-        self._hash = object.__hash__(self._key)
+        try:
+            self._hash = hash(self._key)
+        except TypeError:
+            self._hash = object.__hash__(self._key)
 
     @property
     def key(self) -> t.Any:
