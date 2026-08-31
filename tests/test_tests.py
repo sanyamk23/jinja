@@ -168,6 +168,15 @@ class TestTestsCase:
         tmpl = env.from_string("{{ x is escaped }}|{{ y is escaped }}")
         assert tmpl.render(x="foo", y=Markup("foo")) == "False|True"
 
+    def test_escaped_chainable_undefined(self):
+        from jinja2 import ChainableUndefined
+
+        env = Environment(autoescape=True, undefined=ChainableUndefined)
+        tmpl = env.from_string("{{ parent.child is escaped }}")
+        # ChainableUndefined should not be treated as escaped — hasattr returns
+        # True because __getattr__ returns self, which has __html__.
+        assert tmpl.render(parent={}) == "False"
+
     def test_greaterthan(self, env):
         tmpl = env.from_string("{{ 1 is greaterthan 0 }}|{{ 0 is greaterthan 1 }}")
         assert tmpl.render() == "True|False"

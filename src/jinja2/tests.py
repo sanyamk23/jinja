@@ -5,6 +5,8 @@ import typing as t
 from collections import abc
 from numbers import Number
 
+from markupsafe import Markup
+
 from .runtime import Undefined
 from .utils import pass_environment
 
@@ -202,7 +204,7 @@ def test_iterable(value: t.Any) -> bool:
 
 def test_escaped(value: t.Any) -> bool:
     """Check if the value is escaped."""
-    return hasattr(value, "__html__")
+    return isinstance(value, Markup)
 
 
 def test_in(value: t.Any, seq: t.Container[t.Any]) -> bool:
