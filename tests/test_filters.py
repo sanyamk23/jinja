@@ -190,7 +190,7 @@ class TestFilter:
         assert t.render() == ">>> jinja\n>>> flask"
 
     def test_indent_first_blank_line(self, env):
-        """Blank first line should not be indented when blank=False even with first=True."""
+        """Blank first line with blank=False and first=True should not be indented."""
         t = env.from_string("{% filter indent(4, first=True) %}{% endfilter %}")
         assert t.render() == ""
         t = env.from_string('{{ "foo\nbar"|indent(2, first=True, blank=False) }}')

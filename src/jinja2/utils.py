@@ -746,7 +746,7 @@ class Namespace:
     """A namespace object that can hold arbitrary attributes.  It may be
     initialized from a dictionary or with keyword arguments."""
 
-    def __init__(*args: t.Any, **kwargs: t.Any) -> None:  # noqa: B902
+    def __init__(*args: t.Any, **kwargs: t.Any) -> None:
         self, args = args[0], args[1:]
         self.__attrs = dict(*args, **kwargs)
 
