@@ -45,8 +45,8 @@ class TestLRUCache:
         for protocol in range(3):
             copy = pickle.loads(pickle.dumps(cache, protocol))
             assert copy.capacity == cache.capacity
-            assert copy._mapping == cache._mapping
-            assert copy._queue == cache._queue
+            assert copy.items() == cache.items()
+            assert list(copy) == list(cache)
 
     @pytest.mark.parametrize("copy_func", [LRUCache.copy, shallow_copy])
     def test_copy(self, copy_func):
@@ -54,9 +54,9 @@ class TestLRUCache:
         cache["a"] = 1
         cache["b"] = 2
         copy = copy_func(cache)
-        assert copy._queue == cache._queue
+        assert list(copy) == list(cache)
         copy["c"] = 3
-        assert copy._queue != cache._queue
+        assert list(copy) != list(cache)
         assert copy.keys() == ["c", "b"]
 
     def test_clear(self):
@@ -102,6 +102,30 @@ class TestLRUCache:
         assert len(d) == 1
         assert d.setdefault("b", 2) == 2
         assert len(d) == 2
+
+    def test_unhashable_key(self):
+        """Regression test: unhashable keys (e.g. dict-in-tuple) must not
+        raise TypeError. Python 3.14 raises TypeError when deque.remove()
+        calls __hash__ on keys, which breaks for unhashable types. This is
+        fixed by wrapping each key in an identity-hashed _ImmutableKey."""
+        d = LRUCache(3)
+        key = ({"a": 1}, "foo")  # tuple containing a dict — unhashable
+        d[key] = "value1"
+        assert d[key] == "value1"
+        assert key in d
+        del d[key]
+        assert key not in d
+
+        # Test eviction path with unhashable keys
+        d2 = LRUCache(2)
+        d2[([1, 2], "x")] = "a"
+        d2[([3, 4], "y")] = "b"
+        d2[([5, 6], "z")] = "c"  # evicts first entry
+        assert d2.keys() == [([5, 6], "z"), ([3, 4], "y")]
+
+        # Test __contains__ lookup with unhashable key
+        lookup_key = ([1, 2], "x")
+        assert lookup_key not in d2
 
 
 class TestHelpers:
